@@ -1,0 +1,548 @@
+/**
+ * Escuela Feminista - Interactive Blog & 3D Carousel
+ * Modular JavaScript Engine
+ */
+
+// Fallback dataset in case posts.json fetch fails or runs locally without HTTP server
+const FALLBACK_POSTS = [
+  {
+    "id": 1,
+    "titulo": "Introducción a la Teoría Feminista",
+    "fecha_creacion": "2026-03-01",
+    "url_video": "https://escuelafeminista.org/videos/introduccion-teoria-feminista",
+    "url_imagen": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=80",
+    "descripcion_corta": "Un recorrido introductorio sobre los conceptos fundamentales y la historia de las olas del feminismo.",
+    "categoria": "Teoría y Historia",
+    "tiempo_lectura": "5 min",
+    "autor": "Dra. Sofía Mendoza"
+  },
+  {
+    "id": 2,
+    "titulo": "Colectividad y Redes de Apoyo",
+    "fecha_creacion": "2026-03-15",
+    "url_video": "https://escuelafeminista.org/videos/colectividad-redes-apoyo",
+    "url_imagen": "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=800&q=80",
+    "descripcion_corta": "Estrategias de organización comunitaria y la importancia de tejer alianzas y espacios seguros.",
+    "categoria": "Comunidad",
+    "tiempo_lectura": "7 min",
+    "autor": "Red de Mujeres Alianza"
+  },
+  {
+    "id": 3,
+    "titulo": "Ecofeminismo y Sostenibilidad",
+    "fecha_creacion": "2026-04-02",
+    "url_video": "https://escuelafeminista.org/videos/ecofeminismo-sostenibilidad",
+    "url_imagen": "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=800&q=80",
+    "descripcion_corta": "Reflexiones sobre el cuidado de la vida, el medio ambiente y el impacto de los roles de género.",
+    "categoria": "Ecología",
+    "tiempo_lectura": "6 min",
+    "autor": "Camila Ríos"
+  },
+  {
+    "id": 4,
+    "titulo": "Feminismos decoloniales e Interseccionalidad",
+    "fecha_creacion": "2026-04-20",
+    "url_video": "https://escuelafeminista.org/videos/interseccionalidad-y-decolonialidad",
+    "url_imagen": "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=800&q=80",
+    "descripcion_corta": "Un análisis sobre las múltiples dimensiones de la opresión y el pensamiento crítico desde el sur global.",
+    "categoria": "Interseccionalidad",
+    "tiempo_lectura": "8 min",
+    "autor": "Dra. Esperanza Morales"
+  }
+];
+
+// State Manager
+const AppState = {
+  posts: [],
+  filteredPosts: [],
+  currentIndex: 0,
+  activeCategory: 'todos',
+  searchQuery: '',
+  isAutoplay: true,
+  autoplayTimer: null,
+  touchStartX: 0,
+  touchEndX: 0
+};
+
+/**
+ * Clean markdown/link formatting if present in raw string values
+ */
+function cleanUrl(rawUrl) {
+  if (!rawUrl) return '';
+  const match = rawUrl.match(/\[(.*?)\]\((.*?)\)/);
+  if (match) {
+    return match[2] || match[1];
+  }
+  return rawUrl.trim();
+}
+
+/**
+ * Format ISO date string into friendly Spanish format
+ */
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  } catch (e) {
+    return dateStr;
+  }
+}
+
+/**
+ * Fetch posts from JSON or fallback dataset
+ */
+async function fetchPostsData() {
+  try {
+    const response = await fetch('data/posts.json');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const rawData = await response.json();
+    AppState.posts = sanitizePosts(rawData);
+  } catch (error) {
+    console.warn('Cargando dataset desde la memoria interna (fallback):', error);
+    AppState.posts = sanitizePosts(FALLBACK_POSTS);
+  }
+  AppState.filteredPosts = [...AppState.posts];
+}
+
+/**
+ * Sanitize dataset URLs and add missing metadata defaults
+ */
+function sanitizePosts(data) {
+  return data.map(post => ({
+    ...post,
+    url_video: cleanUrl(post.url_video),
+    url_imagen: cleanUrl(post.url_imagen),
+    categoria: post.categoria || 'General',
+    tiempo_lectura: post.tiempo_lectura || '5 min',
+    autor: post.autor || 'Escuela Feminista'
+  }));
+}
+
+/* ==========================================================================
+   🎡 3D FERRIS WHEEL CAROUSEL ENGINE
+   ========================================================================== */
+
+function initCarousel() {
+  const wheel = document.getElementById('carousel-wheel');
+  const dotsContainer = document.getElementById('carousel-dots');
+  if (!wheel || AppState.posts.length === 0) return;
+
+  // Build Carousel DOM Cards
+  wheel.innerHTML = AppState.posts.map((post, index) => `
+    <div class="carousel-card glass-panel shadow-2xl flex flex-col border border-white/60 group" data-index="${index}">
+      <!-- Header Badge & Image -->
+      <div class="relative h-44 sm:h-52 overflow-hidden bg-slate-900">
+        <img src="${post.url_imagen}" alt="${post.titulo}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" onError="this.src='https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=80'" />
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent"></div>
+        <span class="absolute top-3 left-3 px-3 py-1 rounded-full bg-pink-500 text-white text-xs font-bold shadow-md tracking-wide">
+          <i class="fa-solid fa-sparkles mr-1"></i> ${post.categoria}
+        </span>
+        <button onclick="event.stopPropagation(); openArticleModal(${post.id})" class="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-white/90 text-pink-600 hover:bg-pink-500 hover:text-white flex items-center justify-center shadow-lg transition-all transform hover:scale-110">
+          <i class="fa-solid fa-play text-sm ml-0.5"></i>
+        </button>
+      </div>
+
+      <!-- Card Content -->
+      <div class="p-5 flex flex-col justify-between flex-grow bg-white/80">
+        <div>
+          <div class="flex items-center gap-2 text-xs text-slate-400 font-medium mb-1.5">
+            <span><i class="fa-regular fa-calendar text-pink-500 mr-1"></i>${formatDate(post.fecha_creacion)}</span>
+            <span>•</span>
+            <span><i class="fa-regular fa-clock text-purple-500 mr-1"></i>${post.tiempo_lectura}</span>
+          </div>
+          <h3 class="font-heading font-bold text-lg sm:text-xl text-slate-800 line-clamp-2 leading-snug group-hover:text-pink-600 transition-colors">
+            ${post.titulo}
+          </h3>
+          <p class="text-xs sm:text-sm text-slate-600 line-clamp-2 sm:line-clamp-3 mt-2 leading-relaxed">
+            ${post.descripcion_corta}
+          </p>
+        </div>
+
+        <div class="pt-3 border-t border-pink-100 flex items-center justify-between">
+          <span class="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+            <i class="fa-regular fa-circle-user text-pink-500"></i> ${post.autor}
+          </span>
+          <button onclick="openArticleModal(${post.id})" class="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-pink-500 to-purple-600 text-white text-xs font-bold hover:opacity-90 transition-opacity shadow-sm">
+            Ver Módulo <i class="fa-solid fa-arrow-right ml-1"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  // Build Dot Indicators
+  if (dotsContainer) {
+    dotsContainer.innerHTML = AppState.posts.map((_, idx) => `
+      <button class="dot-btn w-3 h-3 rounded-full transition-all duration-300 ${idx === 0 ? 'bg-pink-500 w-8' : 'bg-pink-200 hover:bg-pink-300'}" data-index="${idx}" aria-label="Ir a diapositiva ${idx + 1}"></button>
+    `).join('');
+
+    dotsContainer.querySelectorAll('.dot-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const targetIdx = parseInt(e.currentTarget.getAttribute('data-index'), 10);
+        goToSlide(targetIdx);
+      });
+    });
+  }
+
+  // Event Listeners for Carousel Controls
+  const prevBtn = document.getElementById('carousel-prev');
+  const nextBtn = document.getElementById('carousel-next');
+  const autoplayBtn = document.getElementById('carousel-autoplay');
+
+  if (prevBtn) prevBtn.addEventListener('click', () => { prevSlide(); resetAutoplayTimer(); });
+  if (nextBtn) nextBtn.addEventListener('click', () => { nextSlide(); resetAutoplayTimer(); });
+
+  if (autoplayBtn) {
+    autoplayBtn.addEventListener('click', toggleAutoplay);
+  }
+
+  // Card click navigation or modal launch
+  const cards = wheel.querySelectorAll('.carousel-card');
+  cards.forEach(card => {
+    card.addEventListener('click', () => {
+      const idx = parseInt(card.getAttribute('data-index'), 10);
+      if (idx === AppState.currentIndex) {
+        openArticleModal(AppState.posts[idx].id);
+      } else {
+        goToSlide(idx);
+        resetAutoplayTimer();
+      }
+    });
+  });
+
+  // Touch & Swipe Support
+  const stage = document.getElementById('carousel-stage');
+  if (stage) {
+    stage.addEventListener('touchstart', (e) => {
+      AppState.touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    stage.addEventListener('touchend', (e) => {
+      AppState.touchEndX = e.changedTouches[0].screenX;
+      handleSwipe();
+    }, { passive: true });
+  }
+
+  // Keyboard Arrow Navigation
+  document.addEventListener('keydown', (e) => {
+    if (document.getElementById('article-modal')?.classList.contains('hidden') === false) return;
+    if (e.key === 'ArrowLeft') {
+      prevSlide();
+      resetAutoplayTimer();
+    } else if (e.key === 'ArrowRight') {
+      nextSlide();
+      resetAutoplayTimer();
+    }
+  });
+
+  // Render initial positions
+  updateCarouselPositions();
+  startAutoplay();
+}
+
+/**
+ * Calculate 3D transformation matrix for each card relative to active index
+ */
+function updateCarouselPositions() {
+  const cards = document.querySelectorAll('.carousel-card');
+  const dots = document.querySelectorAll('.dot-btn');
+  const total = AppState.posts.length;
+
+  if (total === 0) return;
+
+  cards.forEach((card, index) => {
+    // Relative offset from current index (-1, 0, 1, etc.)
+    let offset = index - AppState.currentIndex;
+
+    // Wrap around calculation for smooth infinite loop geometry
+    if (offset > total / 2) offset -= total;
+    if (offset < -total / 2) offset += total;
+
+    const absOffset = Math.abs(offset);
+
+    // Dynamic 3D positioning coordinates
+    const translateX = offset * 220; // Spread along horizontal X axis
+    const translateZ = -absOffset * 180; // Depth offset into 3D space
+    const rotateY = offset * -25; // Tilt angle facing center
+    const scale = Math.max(0.7, 1 - absOffset * 0.15);
+    const opacity = absOffset > 2 ? 0 : (absOffset === 0 ? 1 : 0.75 - absOffset * 0.2);
+    const zIndex = 30 - Math.round(absOffset * 10);
+
+    card.style.transform = `translate3d(${translateX}px, 0px, ${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`;
+    card.style.opacity = opacity;
+    card.style.zIndex = zIndex;
+
+    if (absOffset === 0) {
+      card.classList.add('ring-4', 'ring-pink-400/50', 'shadow-pink-500/20');
+      card.style.pointerEvents = 'auto';
+    } else {
+      card.classList.remove('ring-4', 'ring-pink-400/50', 'shadow-pink-500/20');
+    }
+  });
+
+  // Update Dots Active State
+  dots.forEach((dot, index) => {
+    if (index === AppState.currentIndex) {
+      dot.className = 'dot-btn w-8 h-3 rounded-full bg-pink-500 transition-all duration-300 shadow-sm';
+    } else {
+      dot.className = 'dot-btn w-3 h-3 rounded-full bg-pink-200 hover:bg-pink-300 transition-all duration-300';
+    }
+  });
+}
+
+function goToSlide(index) {
+  const total = AppState.posts.length;
+  AppState.currentIndex = (index + total) % total;
+  updateCarouselPositions();
+}
+
+function nextSlide() {
+  goToSlide(AppState.currentIndex + 1);
+}
+
+function prevSlide() {
+  goToSlide(AppState.currentIndex - 1);
+}
+
+function handleSwipe() {
+  const diff = AppState.touchEndX - AppState.touchStartX;
+  if (Math.abs(diff) > 40) {
+    if (diff < 0) {
+      nextSlide();
+    } else {
+      prevSlide();
+    }
+    resetAutoplayTimer();
+  }
+}
+
+function startAutoplay() {
+  if (AppState.autoplayTimer) clearInterval(AppState.autoplayTimer);
+  if (AppState.isAutoplay) {
+    AppState.autoplayTimer = setInterval(() => {
+      nextSlide();
+    }, 4500);
+  }
+}
+
+function toggleAutoplay() {
+  AppState.isAutoplay = !AppState.isAutoplay;
+  const icon = document.getElementById('autoplay-icon');
+  if (icon) {
+    icon.className = AppState.isAutoplay ? 'fa-solid fa-pause text-base' : 'fa-solid fa-play text-base';
+  }
+  if (AppState.isAutoplay) {
+    startAutoplay();
+  } else if (AppState.autoplayTimer) {
+    clearInterval(AppState.autoplayTimer);
+  }
+}
+
+function resetAutoplayTimer() {
+  if (AppState.isAutoplay) {
+    startAutoplay();
+  }
+}
+
+/* ==========================================================================
+   ARTICLE POSTS GRID & MODAL CONTROLS
+   ========================================================================== */
+
+function renderPostsGrid(postsToRender) {
+  const gridContainer = document.getElementById('posts-grid');
+  const emptyState = document.getElementById('empty-state');
+
+  if (!gridContainer) return;
+
+  if (postsToRender.length === 0) {
+    gridContainer.innerHTML = '';
+    if (emptyState) emptyState.classList.remove('hidden');
+    return;
+  }
+
+  if (emptyState) emptyState.classList.add('hidden');
+
+  gridContainer.innerHTML = postsToRender.map(post => `
+    <article class="group bg-white rounded-2xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1.5 transition-all duration-300 flex flex-col cursor-pointer" onclick="openArticleModal(${post.id})">
+      <!-- Card Image Header -->
+      <div class="relative h-48 overflow-hidden bg-slate-100">
+        <img src="${post.url_imagen}" alt="${post.titulo}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" loading="lazy" onError="this.src='https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=80'" />
+        <div class="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent opacity-40 group-hover:opacity-60 transition-opacity"></div>
+        <span class="absolute top-3 left-3 px-3 py-1 rounded-full bg-white/90 backdrop-blur-md text-pink-600 text-xs font-bold shadow-sm">
+          ${post.categoria}
+        </span>
+      </div>
+
+      <!-- Card Body -->
+      <div class="p-5 flex flex-col flex-grow">
+        <div class="flex items-center gap-2 text-xs text-slate-400 mb-2">
+          <span><i class="fa-regular fa-calendar text-pink-400 mr-1"></i>${formatDate(post.fecha_creacion)}</span>
+          <span>•</span>
+          <span><i class="fa-regular fa-clock text-purple-400 mr-1"></i>${post.tiempo_lectura}</span>
+        </div>
+
+        <h3 class="font-heading font-bold text-lg text-slate-800 group-hover:text-pink-600 transition-colors line-clamp-2 leading-snug mb-2">
+          ${post.titulo}
+        </h3>
+
+        <p class="text-xs text-slate-500 line-clamp-3 leading-relaxed mb-4 flex-grow">
+          ${post.descripcion_corta}
+        </p>
+
+        <!-- Card Footer Link -->
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-semibold text-pink-500 group-hover:text-purple-600 transition-colors">
+          <span>Explorar Módulo</span>
+          <i class="fa-solid fa-arrow-right transform group-hover:translate-x-1 transition-transform"></i>
+        </div>
+      </div>
+    </article>
+  `).join('');
+}
+
+// Global scope initialization helper for module script
+window.openArticleModal = (id) => {
+  const post = AppState.posts.find(p => p.id === id);
+  if (!post) return;
+
+  const modal = document.getElementById('article-modal');
+  const modalCard = document.getElementById('modal-card');
+  const modalImg = document.getElementById('modal-img');
+  const modalCategory = document.getElementById('modal-category');
+  const modalTitle = document.getElementById('modal-title');
+  const modalDate = document.getElementById('modal-date');
+  const modalReadtime = document.getElementById('modal-readtime');
+  const modalAuthor = document.getElementById('modal-author');
+  const modalDesc = document.getElementById('modal-description');
+  const modalVideoLink = document.getElementById('modal-video-link');
+  const modalVideoBtn = document.getElementById('modal-video-btn');
+
+  if (modalImg) modalImg.src = post.url_imagen;
+  if (modalCategory) modalCategory.textContent = post.categoria;
+  if (modalTitle) modalTitle.textContent = post.titulo;
+  if (modalDate) modalDate.textContent = formatDate(post.fecha_creacion);
+  if (modalReadtime) modalReadtime.textContent = post.tiempo_lectura;
+  if (modalAuthor) modalAuthor.textContent = post.autor;
+  if (modalDesc) modalDesc.textContent = post.descripcion_corta;
+
+  if (modalVideoLink) {
+    modalVideoLink.href = post.url_video;
+    modalVideoLink.textContent = post.url_video;
+  }
+  if (modalVideoBtn) {
+    modalVideoBtn.href = post.url_video;
+  }
+
+  if (modal) {
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+      if (modalCard) {
+        modalCard.classList.remove('scale-95', 'opacity-0');
+        modalCard.classList.add('scale-100', 'opacity-100');
+      }
+    }, 10);
+  }
+};
+
+function closeArticleModal() {
+  const modal = document.getElementById('article-modal');
+  const modalCard = document.getElementById('modal-card');
+
+  if (modalCard) {
+    modalCard.classList.remove('scale-100', 'opacity-100');
+    modalCard.classList.add('scale-95', 'opacity-0');
+  }
+
+  setTimeout(() => {
+    if (modal) modal.classList.add('hidden');
+  }, 200);
+}
+
+/**
+ * Filter and Search handler
+ */
+function applyFilters() {
+  AppState.filteredPosts = AppState.posts.filter(post => {
+    const matchesCategory = AppState.activeCategory === 'todos' || post.categoria === AppState.activeCategory;
+    const matchesSearch = !AppState.searchQuery ||
+      post.titulo.toLowerCase().includes(AppState.searchQuery.toLowerCase()) ||
+      post.descripcion_corta.toLowerCase().includes(AppState.searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  renderPostsGrid(AppState.filteredPosts);
+}
+
+/**
+ * Initialize Application
+ */
+document.addEventListener('DOMContentLoaded', async () => {
+  await fetchPostsData();
+  initCarousel();
+  renderPostsGrid(AppState.filteredPosts);
+
+  // Setup Search Input Event Listener
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      AppState.searchQuery = e.target.value.trim();
+      applyFilters();
+    });
+  }
+
+  // Setup Filter Buttons
+  const filterBtns = document.querySelectorAll('.filter-btn');
+  filterBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      filterBtns.forEach(b => {
+        b.className = 'filter-btn px-4 py-2 rounded-full text-xs font-semibold bg-white text-slate-600 hover:bg-pink-50 border border-slate-200 transition-all';
+      });
+      e.currentTarget.className = 'filter-btn px-4 py-2 rounded-full text-xs font-semibold bg-pink-500 text-white shadow-sm transition-all';
+
+      AppState.activeCategory = e.currentTarget.getAttribute('data-category');
+      applyFilters();
+    });
+  });
+
+  // Setup Modal Close Handlers
+  const modalClose = document.getElementById('modal-close');
+  const modalBackdrop = document.getElementById('article-modal');
+
+  if (modalClose) modalClose.addEventListener('click', closeArticleModal);
+  if (modalBackdrop) {
+    modalBackdrop.addEventListener('click', (e) => {
+      if (e.target === modalBackdrop) closeArticleModal();
+    });
+  }
+
+  // Like button interaction in modal
+  const likeBtn = document.getElementById('btn-like');
+  if (likeBtn) {
+    likeBtn.addEventListener('click', () => {
+      const countSpan = document.getElementById('like-count');
+      if (countSpan) {
+        let currentLikes = parseInt(countSpan.textContent, 10);
+        countSpan.textContent = currentLikes + 1;
+        likeBtn.classList.add('text-pink-600', 'bg-pink-100');
+      }
+    });
+  }
+
+  // Join community notification demo button
+  const joinBtn = document.getElementById('btn-nueva-reflexion');
+  if (joinBtn) {
+    joinBtn.addEventListener('click', () => {
+      alert('¡Bienvenida a la Escuela Feminista! Gracias por ser parte de nuestra red de saberes y apoyo comunitario.');
+    });
+  }
+
+  console.log("App initialisation complete.");
+});
+
+export { AppState, fetchPostsData, renderPostsGrid, formatDate, initCarousel };

@@ -1,0 +1,46 @@
+[
+    {
+        "id": 1,
+        "titulo": "Introducción a la Teoría Feminista",
+        "fecha_creacion": "2026-03-01",
+        "url_video": "https://escuelafeminista.org/videos/introduccion-teoria-feminista",
+        "url_imagen": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=80",
+        "descripcion_corta": "Un recorrido introductorio sobre los conceptos fundamentales y la historia de las olas del feminismo.",
+        "categoria": "Teoría y Historia",
+        "tiempo_lectura": "5 min",
+        "autor": "Dra. Sofía Mendoza"
+    },
+    {
+        "id": 2,
+        "titulo": "Colectividad y Redes de Apoyo",
+        "fecha_creacion": "2026-03-15",
+        "url_video": "https://escuelafeminista.org/videos/colectividad-redes-apoyo",
+        "url_imagen": "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=800&q=80",
+        "descripcion_corta": "Estrategias de organización comunitaria y la importancia de tejer alianzas y espacios seguros.",
+        "categoria": "Comunidad",
+        "tiempo_lectura": "7 min",
+        "autor": "Red de Mujeres Alianza"
+    },
+    {
+        "id": 3,
+        "titulo": "Ecofeminismo y Sostenibilidad",
+        "fecha_creacion": "2026-04-02",
+        "url_video": "https://escuelafeminista.org/videos/ecofeminismo-sostenibilidad",
+        "url_imagen": "https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?auto=format&fit=crop&w=800&q=80",
+        "descripcion_corta": "Reflexiones sobre el cuidado de la vida, el medio ambiente y el impacto de los roles de género.",
+        "categoria": "Ecología",
+        "tiempo_lectura": "6 min",
+        "autor": "Camila Ríos"
+    },
+    {
+        "id": 4,
+        "titulo": "Feminismos decoloniales e Interseccionalidad",
+        "fecha_creacion": "2026-04-20",
+        "url_video": "https://escuelafeminista.org/videos/interseccionalidad-y-decolonialidad",
+        "url_imagen": "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=800&q=80",
+        "descripcion_corta": "Un análisis sobre las múltiples dimensiones de la opresión y el pensamiento crítico desde el sur global.",
+        "categoria": "Interseccionalidad",
+        "tiempo_lectura": "8 min",
+        "autor": "Dra. Esperanza Morales"
+    }
+]
